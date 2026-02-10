@@ -1,0 +1,90 @@
+{
+  "current_run_id": "run_000001",
+  "last_run_id": "run_000000",
+
+  "weighted_inputs": {
+    "architect": 0.5,
+    "implementer": 0.5
+  },
+
+  "model_pool": {
+    "M1": {
+      "label": "Gemini 2.5 Pro",
+      "cost_tier": "mid",
+      "provider": "gemini",
+      "provider_model": "gemini-2.5-pro",
+      "params": { "temperature": 0.0 }
+    },
+    "M2": {
+      "label": "Claude Sonnet 4.5",
+      "cost_tier": "mid",
+      "provider": "anthropic",
+      "provider_model": "claude-sonnet-4-5-20250929",
+      "params": { "temperature": 0.0 }
+    }
+  },
+
+  "chairman_pool": {
+    "C1": {
+      "label": "GPT-4.1 Chairman",
+      "provider": "openai",
+      "provider_model": "gpt-4.1",
+      "params": { "temperature": 0.0 },
+      "cost_tier": "mid"
+    }
+  },
+  
+  "chairman_active": "C1",
+
+  "role_model_stats": {
+    "architect": {
+      "M1": { "n": 0, "mean_reward": 0.0, "mean_cost": 0.0, "last_used_run_id": null, "ucb": 0.0},
+      "M2": { "n": 0, "mean_reward": 0.0, "mean_cost": 0.0, "last_used_run_id": null, "ucb": 0.0 }
+    },
+    "implementer": {
+      "M1": { "n": 0, "mean_reward": 0.0, "mean_cost": 0.0, "last_used_run_id": null, "ucb": 0.0 },
+      "M2": { "n": 0, "mean_reward": 0.0, "mean_cost": 0.0, "last_used_run_id": null, "ucb": 0.0 }
+    }
+  },
+
+  "routing_policy": {
+    "ucb_c": 0.5,
+    "cost_penalty": 0.4
+  },
+
+  "exploration": {
+    "warmup_runs": 3,
+    "runs_completed": 0
+  },
+
+  "chairman_summary_store": {
+    "bootstrap": { "M1": {}, "M2": {} },
+    "iterate": {}
+},
+
+  "timeout_defaults": {
+      "run_agents_timeout_s": 300,
+      "chairman_timeout_s": 360
+  },
+
+  "directory_structure": {
+    "base_path": "string",
+    "M1": {
+      "path": "string",
+      "dirs": {},
+      "files": []
+    },
+    "M2": {
+      "path": "string",
+      "dirs": {},
+      "files": []
+    }
+  },
+
+  "final_model": "string",
+
+  "chairman_edits": {
+    "bootstrap": { "M1": {}, "M2": {} },
+    "iterate": {}
+  }
+}

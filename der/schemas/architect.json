@@ -1,0 +1,11 @@
+{
+    "design_moves": [
+        {
+            "proposal_id": "string",
+            "path": "string",
+            "function": "string",
+            "goal": "string",
+            "constraints": ["string"]
+        }
+    ]
+}

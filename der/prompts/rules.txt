@@ -1,0 +1,44 @@
+HARD RULES (AUTHORITATIVE FOR ALL ROLES):
+
+1) Output MUST be valid JSON only.
+   - No markdown, no backticks, no commentary.
+
+2) Output MUST conform exactly to the provided schema
+   - (field names, nesting, required fields, and types).
+
+3) Do NOT hallucinate files or paths.
+   - All existing paths MUST come from DIRECTORY_STRUCTURE_JSON.
+   - New files may only be created when explicitly allowed by your role’s prompt.
+
+4) Authoritative coding language is TASK_JSON.language.
+   - If missing, empty, or null, default to "python".
+
+5) proposal_id integrity:
+   - proposal_id values originate from the Architect via ARCHITECT_OUTPUT_JSON.
+   - proposal_id MUST NOT be invented.
+   - proposal_id MUST NOT be modified once introduced.
+   - A single proposal_id MAY appear in multiple artifacts (imports, constants, helpers), but all such entries must implement the same design_move.
+
+6) Defensive programming is REQUIRED when writing or modifying code:
+   - guard against empty inputs
+   - check for missing keys/fields
+   - avoid division by zero
+   - handle None/NaN/inf where applicable
+   - Apply defensively, but do not introduce unnecessary complexity.
+
+7) Prefer minimal, safe, and localized changes:
+   - avoid broad refactors
+   - avoid touching unrelated functions
+   - minimize churn
+   - preserve existing behavior unless explicitly required by the task
+
+8) TASK_JSON.phase (if present) controls behavior according to each role's prompt.
+   - If missing, default to "bootstrap".
+
+9) Do NOT invent results, metrics, benchmarks, or outcomes.
+   - Only reason from TASK_JSON, DIRECTORY_STRUCTURE_JSON, and the explicitly provided inputs.
+
+10) If required information is missing or ambiguous:
+   - proceed with best-effort (do not abort)
+   - minimize assumptions
+   - choose the safest deterministic interpretation consistent with the task.

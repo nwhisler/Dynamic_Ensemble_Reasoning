@@ -1,0 +1,6 @@
+anthropic
+langgraph
+numpy
+openai
+protobuf
+google-generativeai

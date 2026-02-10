@@ -1,0 +1,12 @@
+{
+  "modules_added_and_updated": [
+    {
+      "proposal_ids": ["string"],
+      "path": "string",
+      "content": "string",
+      "included_functions": ["string"],
+      "included_imports": ["string"],
+      "included_constants": [{"name":"string", "value": "string"}]
+    }
+  ]
+}

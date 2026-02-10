@@ -1,0 +1,29 @@
+{
+  "approved_edits": [
+    {
+      "proposal_ids": ["string"],
+      "path": "string",
+      "content": "string"
+    }
+  ],
+
+  "chairman_summary": {
+    "accepted_design_moves": [{ "proposal_id": "string", "goal": "string" }],
+    "rejected_design_moves": [{ "proposal_id": "string", "reason": "string" }],
+    "files_changed": ["string"],
+    "files_created": ["string"],
+    "next_priorities": ["string"],
+    "added_design_moves": [{ "proposal_id": "string", "goal": "string" }]
+  },
+
+  "scoring": {
+    "architect": {
+      "judge_score": 0.0,
+      "cost_score": 0.0
+    },
+    "implementer": {
+      "judge_score": 0.0,
+      "cost_score": 0.0      
+    }
+  }
+}

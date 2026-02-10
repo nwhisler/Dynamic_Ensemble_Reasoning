@@ -1,0 +1,6 @@
+{
+  "phase": "string",
+  "goal": "string",
+  "language": "python|java|c++",
+  "style": "clean|minimal|performance"
+}

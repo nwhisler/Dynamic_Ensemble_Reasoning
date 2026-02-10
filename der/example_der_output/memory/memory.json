@@ -1,0 +1,438 @@
+{
+  "chairman_active":"C1",
+  "chairman_edits":{
+    "bootstrap":{
+      "M1":{
+        "approved_edits":[
+          {
+            "content":"import json\n\ndef validate_log_entry(entry):\n    \"\"\"\n    Validate a single log entry object against a predefined schema.\n\n    A valid entry must be a dictionary containing 'timestamp', 'level',\n    and 'message' keys, all with string values.\n\n    Args:\n        entry: A dictionary representing a single log entry.\n\n    Returns:\n        True if the entry is valid, False otherwise.\n    \"\"\"\n    if not isinstance(entry, dict):\n        return False\n    \n    required_keys = {\"timestamp\", \"level\", \"message\"}\n    if not required_keys.issubset(entry.keys()):\n        return False\n\n    if not all(isinstance(entry[key], str) for key in required_keys):\n        return False\n        \n    return True\n\ndef parse_log_file(file_path):\n    \"\"\"\n    Read a .jsonl log file, parse and validate each line, and return a sorted list of valid log entries.\n\n    This function gracefully handles file-not-found errors and skips lines\n    that are empty, contain invalid JSON, or fail schema validation.\n\n    Args:\n        file_path: The path to the .jsonl log file.\n\n    Returns:\n        A list of valid log entry dictionaries, sorted by timestamp.\n    \"\"\"\n    valid_entries = []\n    try:\n        with open(file_path, 'r', encoding='utf-8') as f:\n            for line in f:\n                line = line.strip()\n                if not line:\n                    continue\n                \n                try:\n                    log_entry = json.loads(line)\n                    if validate_log_entry(log_entry):\n                        valid_entries.append(log_entry)\n                except json.JSONDecodeError:\n                    # Skip lines that are not valid JSON\n                    continue\n    except FileNotFoundError:\n        print(f\"Error: File not found at '{file_path}'\")\n        return []\n\n    valid_entries.sort(key=lambda entry: entry['timestamp'])\n    return valid_entries",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\parser.py",
+            "proposal_ids":[
+              "schema_validation_logic",
+              "deterministic_log_parsing"
+            ]
+          },
+          {
+            "content":"import argparse\n\ndef main():\n    \"\"\"\n    Main entry point for the CLI application.\n    Parses arguments and dispatches to command handlers.\n    \"\"\"\n    parser = argparse.ArgumentParser(description=\"Analyze .jsonl event logs.\")\n    parser.add_argument(\"logfile\", help=\"Path to the input .jsonl log file.\")\n    parser.add_argument(\"--start-time\", help=\"Start of the time window (ISO 8601 format).\")\n    parser.add_argument(\"--end-time\", help=\"End of the time window (ISO 8601 format).\")\n\n    subparsers = parser.add_subparsers(dest=\"command\", required=True, help=\"Available commands\")\n\n    # Summary command\n    subparsers.add_parser(\"summary\", help=\"Show a summary of log entries.\")\n\n    # Filter command\n    parser_filter = subparsers.add_parser(\"filter\", help=\"Filter log entries by time window.\")\n\n    # Top command\n    parser_top = subparsers.add_parser(\"top\", help=\"Show the top N most frequent log messages.\")\n    parser_top.add_argument(\"--n\", type=int, default=10, help=\"Number of results to show.\")\n\n    # Export command\n    parser_export = subparsers.add_parser(\"export\", help=\"Export log entries to a file.\")\n    parser_export.add_argument(\"--output\", help=\"Path to the output file.\")\n\n    args = parser.parse_args()\n\n    # Placeholder for command delegation\n    if args.command == \"summary\":\n        print(f\"Executing summary command for {args.logfile}\")\n        # Call summary handler function here\n    elif args.command == \"filter\":\n        print(f\"Executing filter command for {args.logfile} from {args.start_time} to {args.end_time}\")\n        # Call filter handler function here\n    elif args.command == \"top\":\n        print(f\"Executing top command for {args.logfile} with n={args.n}\")\n        # Call top handler function here\n    elif args.command == \"export\":\n        print(f\"Executing export command for {args.logfile} to {args.output}\")\n        # Call export handler function here\n\nif __name__ == \"__main__\":\n    main()",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\main.py",
+            "proposal_ids":[
+              "cli_time_window_args"
+            ]
+          }
+        ]
+      },
+      "M2":{
+        "approved_edits":[
+          {
+            "content":"from datetime import datetime\nfrom collections import Counter\nimport json\n\nVALID_LEVELS = {'DEBUG', 'INFO', 'WARN', 'ERROR'}\n\ndef execute_summary(log_entries):\n    \"\"\"\n    Generate summary statistics from loaded logs.\n    \n    Args:\n        log_entries: List of validated log entry dicts\n        \n    Returns:\n        Dict with 'total' (int) and 'by_level' (dict) keys\n    \"\"\"\n    if not log_entries:\n        return {'total': 0, 'by_level': {}}\n    level_counts = {}\n    for entry in log_entries:\n        level = entry.get('level', '')\n        level_counts[level] = level_counts.get(level, 0) + 1\n    sorted_by_level = dict(sorted(level_counts.items()))\n    return {\n        'total': len(log_entries),\n        'by_level': sorted_by_level\n    }\n\ndef execute_filter(log_entries, level, start_time=None, end_time=None):\n    \"\"\"\n    Filter log entries by level and optional time window.\n    \n    Args:\n        log_entries: List of validated log entry dicts\n        level: Level string to filter by\n        start_time: Optional ISO timestamp string for start of window\n        end_time: Optional ISO timestamp string for end of window\n        \n    Returns:\n        List of filtered entries sorted by timestamp, then event_type\n    \"\"\"\n    if level not in VALID_LEVELS:\n        return []\n    filtered = []\n    for entry in log_entries:\n        if entry.get('level') != level:\n            continue\n        if start_time is not None or end_time is not None:\n            timestamp_str = entry.get('timestamp', '')\n            if not _is_within_time_window(timestamp_str, start_time, end_time):\n                continue\n        filtered.append(entry)\n    filtered.sort(key=lambda e: (e.get('timestamp', ''), e.get('event_type', '')))\n    return filtered\n\ndef _is_within_time_window(timestamp_str, start_time, end_time):\n    \"\"\"\n    Check if timestamp falls within the specified time window.\n    \n    Args:\n        timestamp_str: ISO timestamp string\n        start_time: Optional ISO timestamp string for start\n        end_time: Optional ISO timestamp string for end\n        \n    Returns:\n        Boolean indicating if timestamp is within window\n    \"\"\"\n    if not timestamp_str:\n        return False\n    try:\n        ts = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))\n    except (ValueError, AttributeError):\n        return False\n    if start_time is not None:\n        try:\n            start = datetime.fromisoformat(start_time.replace('Z', '+00:00'))\n            if ts < start:\n                return False\n        except (ValueError, AttributeError):\n            return False\n    if end_time is not None:\n        try:\n            end = datetime.fromisoformat(end_time.replace('Z', '+00:00'))\n            if ts > end:\n                return False\n        except (ValueError, AttributeError):\n            return False\n    return True\n\ndef execute_top(log_entries, n):\n    \"\"\"\n    Return top N most frequent event types with counts.\n    \n    Args:\n        log_entries: List of validated log entry dicts\n        n: Integer number of top entries to return\n        \n    Returns:\n        List of tuples (event_type, count) sorted by count desc, event_type asc\n    \"\"\"\n    if not isinstance(n, int) or n <= 0:\n        return []\n    if not log_entries:\n        return []\n    event_counts = Counter()\n    for entry in log_entries:\n        event_type = entry.get('event_type', '')\n        if event_type:\n            event_counts[event_type] += 1\n    sorted_events = sorted(\n        event_counts.items(),\n        key=lambda x: (-x[1], x[0])\n    )\n    return sorted_events[:n]\n\ndef execute_export(logs, output_path, level=None, start_time=None, end_time=None):\n    \"\"\"\n    Export filtered or full log entries to a JSON file with deterministic ordering.\n    \n    Args:\n        logs: List of log entry dicts\n        output_path: String path to output JSON file\n        level: Optional level string to filter by\n        start_time: Optional ISO timestamp string for start of window\n        end_time: Optional ISO timestamp string for end of window\n        \n    Returns:\n        Integer count of exported entries\n    \"\"\"\n    if not logs:\n        logs = []\n    filtered = []\n    for entry in logs:\n        if not entry.get('timestamp') or not entry.get('event_type') or not entry.get('level'):\n            continue\n        if level is not None and entry.get('level') != level:\n            continue\n        if start_time is not None or end_time is not None:\n            if not _is_within_time_window(entry.get('timestamp', ''), start_time, end_time):\n                continue\n        filtered.append(entry)\n    filtered.sort(key=lambda e: (e.get('timestamp', ''), e.get('event_type', '')))\n    try:\n        with open(output_path, 'w', encoding='utf-8') as f:\n            json.dump(filtered, f, indent=2)\n    except (IOError, OSError) as e:\n        return 0\n    return len(filtered)",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\commands.py",
+            "proposal_ids":[
+              "arch_007_export_command"
+            ]
+          },
+          {
+            "content":"#!/usr/bin/env python3\n\"\"\"CLI entry point for log_analyzer tool.\"\"\"\n\nimport argparse\nimport sys\nimport os\nfrom loader import load_jsonl_logs\nfrom commands import execute_summary, execute_filter, execute_top, execute_export\n\n\ndef main():\n    \"\"\"Parse CLI arguments for commands summary, filter, top, and export with required input file path and optional parameters.\"\"\"\n    if not _validate_args():\n        return 1\n    \n    parser = argparse.ArgumentParser(\n        prog=\"log_analyzer\",\n        description=\"Analyze JSONL event logs with deterministic output\"\n    )\n    \n    subparsers = parser.add_subparsers(dest=\"command\", required=True, help=\"Available commands\")\n    \n    summary_parser = subparsers.add_parser(\"summary\", help=\"Generate summary statistics\")\n    summary_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    \n    filter_parser = subparsers.add_parser(\"filter\", help=\"Filter logs by criteria\")\n    filter_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    filter_parser.add_argument(\"--level\", help=\"Filter by log level\")\n    filter_parser.add_argument(\"--event-type\", help=\"Filter by event type\")\n    filter_parser.add_argument(\"--start-time\", help=\"Filter start time (ISO 8601)\")\n    filter_parser.add_argument(\"--end-time\", help=\"Filter end time (ISO 8601)\")\n    \n    top_parser = subparsers.add_parser(\"top\", help=\"Show top N events\")\n    top_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    top_parser.add_argument(\"--n\", type=int, default=10, help=\"Number of top events\")\n    top_parser.add_argument(\"--by\", default=\"event_type\", help=\"Group by field\")\n    \n    export_parser = subparsers.add_parser(\"export\", help=\"Export filtered logs to JSON\")\n    export_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    export_parser.add_argument(\"--output\", required=True, help=\"Output JSON file path\")\n    export_parser.add_argument(\"--level\", help=\"Filter by log level\")\n    export_parser.add_argument(\"--event-type\", help=\"Filter by event type\")\n    export_parser.add_argument(\"--start-time\", help=\"Filter start time (ISO 8601)\")\n    export_parser.add_argument(\"--end-time\", help=\"Filter end time (ISO 8601)\")\n    \n    args = parser.parse_args()\n    \n    if not _validate_input_file(args.input):\n        return 1\n    \n    result = dispatch_command(args)\n    if result is None:\n        return 1\n    \n    return 0\n\n\ndef _validate_args():\n    \"\"\"Validate that arguments are provided.\"\"\"\n    if not sys.argv or len(sys.argv) < 2:\n        return True\n    return True\n\n\ndef _validate_input_file(file_path):\n    \"\"\"Validate that input file exists.\"\"\"\n    if not file_path:\n        print(\"Error: Input file path is required\", file=sys.stderr)\n        return False\n    \n    if not os.path.exists(file_path):\n        print(f\"Error: Input file does not exist: {file_path}\", file=sys.stderr)\n        return False\n    \n    if not os.path.isfile(file_path):\n        print(f\"Error: Input path is not a file: {file_path}\", file=sys.stderr)\n        return False\n    \n    return True\n\n\ndef dispatch_command(args):\n    \"\"\"\n    Route validated CLI arguments to the appropriate command function.\n    \n    Args:\n        args: Parsed argparse namespace with command and parameters\n        \n    Returns:\n        Command result or None on failure\n    \"\"\"\n    try:\n        log_entries = load_jsonl_logs(args.input)\n    except Exception as e:\n        print(f\"Error loading logs: {e}\", file=sys.stderr)\n        return None\n    if args.command == \"summary\":\n        return execute_summary(log_entries)\n    elif args.command == \"filter\":\n        level = getattr(args, 'level', None)\n        start_time = getattr(args, 'start_time', None)\n        end_time = getattr(args, 'end_time', None)\n        if level:\n            return execute_filter(log_entries, level, start_time, end_time)\n        return log_entries\n    elif args.command == \"top\":\n        n = getattr(args, 'n', 10)\n        return execute_top(log_entries, n)\n    elif args.command == \"export\":\n        output = getattr(args, 'output', None)\n        level = getattr(args, 'level', None)\n        start_time = getattr(args, 'start_time', None)\n        end_time = getattr(args, 'end_time', None)\n        return execute_export(log_entries, output, level, start_time, end_time)\n    return None\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\main.py",
+            "proposal_ids":[
+              "arch_008_cli_dispatch"
+            ]
+          },
+          {
+            "content":"\"\"\"Output formatting functions for log_analyzer CLI.\"\"\"\n\n\ndef format_summary_output(summary):\n    \"\"\"\n    Format summary statistics dictionary into deterministic human-readable string.\n    \n    Args:\n        summary: Dict with 'total' (int) and 'by_level' (dict) keys\n        \n    Returns:\n        Single string with newline separators\n    \"\"\"\n    if not summary:\n        return \"Total: 0\"\n    total = summary.get('total', 0)\n    by_level = summary.get('by_level', {})\n    lines = [f\"Total: {total}\"]\n    if by_level:\n        sorted_levels = sorted(by_level.items())\n        for level, count in sorted_levels:\n            lines.append(f\"{level}: {count}\")\n    return \"\\n\".join(lines)",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\output.py",
+            "proposal_ids":[
+              "arch_009_output_formatter"
+            ]
+          }
+        ]
+      }
+    },
+    "iterate":{
+      "approved_edits":[]
+    }
+  },
+  "chairman_pool":{
+    "C1":{
+      "cost_tier":"mid",
+      "label":"GPT-4.1 Chairman",
+      "params":{
+        "temperature":0.0
+      },
+      "provider":"openai",
+      "provider_model":"gpt-4.1"
+    }
+  },
+  "chairman_summary_store":{
+    "bootstrap":{
+      "M1":{
+        "accepted_design_moves":[
+          {
+            "goal":"Implement strict schema validation for a single log entry, ensuring it contains required fields ('timestamp', 'level', 'message') with correct data types.",
+            "proposal_id":"schema_validation_logic"
+          },
+          {
+            "goal":"Parse a .jsonl log file, validate each entry, and return a list of valid entries sorted by timestamp to ensure deterministic processing.",
+            "proposal_id":"deterministic_log_parsing"
+          },
+          {
+            "goal":"Update the CLI argument parser to accept optional '--start-time' and '--end-time' arguments for time-window filtering.",
+            "proposal_id":"cli_time_window_args"
+          }
+        ],
+        "added_design_moves":[],
+        "files_changed":[
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\parser.py",
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\main.py"
+        ],
+        "files_created":[],
+        "next_priorities":[
+          "Implement the actual logic for the summary, filter, top, and export command handlers.",
+          "Ensure time-window filtering is applied in the filter handler using the parsed --start-time and --end-time arguments.",
+          "Add robust error handling and user feedback for invalid time formats and missing arguments.",
+          "Ensure deterministic output ordering for all commands, especially for export and top."
+        ],
+        "rejected_design_moves":[]
+      },
+      "M2":{
+        "accepted_design_moves":[
+          {
+            "goal":"Export filtered or full log entries to a JSON file with deterministic ordering by timestamp then event_type, validating output schema",
+            "proposal_id":"arch_007_export_command"
+          },
+          {
+            "goal":"Route validated CLI arguments to the appropriate command function in commands module and handle command execution",
+            "proposal_id":"arch_008_cli_dispatch"
+          },
+          {
+            "goal":"Format summary statistics dictionary into deterministic human-readable string output for CLI display",
+            "proposal_id":"arch_009_output_formatter"
+          }
+        ],
+        "added_design_moves":[],
+        "files_changed":[
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\commands.py",
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\main.py"
+        ],
+        "files_created":[
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\output.py"
+        ],
+        "next_priorities":[
+          "Ensure that event-type filtering is implemented for filter and export commands, as the current dispatch_command and execute_export do not use the event-type argument.",
+          "Add robust error handling and user feedback for invalid command parameters and file I/O errors.",
+          "Implement output formatting for filter, top, and export commands for CLI display.",
+          "Add unit tests for all command functions and CLI argument parsing."
+        ],
+        "rejected_design_moves":[]
+      }
+    },
+    "iterate":{
+      "accepted_design_moves":[],
+      "added_design_moves":[],
+      "files_changed":[],
+      "files_created":[],
+      "next_priorities":[
+        "Update the CLI argument validation in main.py to ensure that the 'filter' command requires the --event-type argument (non-empty, non-whitespace), as required by the test suite and to match the strict schema in the goal.",
+        "Ensure that all error messages for invalid or missing --event-type arguments in both 'filter' and 'top' commands are consistent and start with 'Error: --event-type argument cannot be empty or contain only whitespace.'",
+        "Review and update the test_cli.py test cases to ensure that they expect the correct error message format for missing or empty --event-type arguments.",
+        "Verify that all commands (summary, filter, top, export) strictly enforce schema validation, deterministic output ordering, and time-window filtering as described in the goal and as tested in test_cli.py.",
+        "Once the above are complete and all tests in test_cli.py pass, the program will fully meet the goal.",
+        "Implement the required functions and tests for group-by argument validation and top command group-by test cases in main.py and test_cli.py as specified in the design moves."
+      ],
+      "rejected_design_moves":[
+        {
+          "proposal_id":"add_group_by_validation",
+          "reason":"No updated module content was provided for main.py, so the required function _validate_group_by_arg could not be verified or approved."
+        },
+        {
+          "proposal_id":"add_test_for_invalid_group_by_value",
+          "reason":"No updated module content was provided for test_cli.py, so the required test function could not be verified or approved."
+        },
+        {
+          "proposal_id":"add_test_for_top_group_by_mixed_levels",
+          "reason":"No updated module content was provided for test_cli.py, so the required test function could not be verified or approved."
+        },
+        {
+          "proposal_id":"add_test_for_missing_group_by_value",
+          "reason":"No updated module content was provided for test_cli.py, so the required test function could not be verified or approved."
+        }
+      ]
+    }
+  },
+  "current_run_id":"run_000031",
+  "directory_structure":{
+    "M1":{
+      "dirs":{
+        "log_analyzer":{
+          "dirs":{},
+          "files":[
+            {
+              "constants":[],
+              "functions":[
+                "main"
+              ],
+              "imports":[
+                "import argparse"
+              ],
+              "module":"main.py",
+              "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\main.py"
+            },
+            {
+              "constants":[],
+              "functions":[
+                "validate_log_entry",
+                "parse_log_file"
+              ],
+              "imports":[
+                "import json"
+              ],
+              "module":"parser.py",
+              "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\parser.py"
+            },
+            {
+              "constants":[],
+              "functions":[
+                "handle_summary",
+                "handle_filter",
+                "handle_top"
+              ],
+              "imports":[
+                "import collections"
+              ],
+              "module":"commands.py",
+              "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\commands.py"
+            }
+          ],
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer"
+        }
+      },
+      "files":[],
+      "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1"
+    },
+    "M2":{
+      "dirs":{},
+      "files":[
+        {
+          "constants":[],
+          "functions":[
+            "main",
+            "_exit_with_error",
+            "_validate_args",
+            "_validate_input_file",
+            "_validate_time_args",
+            "_validate_event_type_arg",
+            "_validate_format_arg",
+            "dispatch_command"
+          ],
+          "imports":[
+            "import argparse",
+            "import sys",
+            "import os",
+            "from datetime import datetime",
+            "from loader import load_jsonl_logs",
+            "from commands import execute_summary, execute_filter, execute_top, execute_export",
+            "from output import format_summary_output, format_filter_output, format_top_output, format_export_output"
+          ],
+          "module":"main.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\main.py"
+        },
+        {
+          "constants":[
+            {
+              "name":"VALID_LEVELS",
+              "value":"{'DEBUG', 'INFO', 'WARN', 'ERROR'}"
+            },
+            {
+              "name":"REQUIRED_FIELDS",
+              "value":"{'timestamp', 'event_type', 'level', 'message'}"
+            }
+          ],
+          "functions":[
+            "validate_log_entry",
+            "_has_required_fields",
+            "_validate_timestamp",
+            "_validate_event_type",
+            "_validate_level"
+          ],
+          "imports":[
+            "from datetime import datetime"
+          ],
+          "module":"validation.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\validation.py"
+        },
+        {
+          "constants":[],
+          "functions":[
+            "load_jsonl_logs",
+            "_read_and_parse_lines",
+            "_parse_json_line",
+            "_filter_valid_entries",
+            "_sort_by_timestamp"
+          ],
+          "imports":[
+            "import json",
+            "import sys",
+            "from validation import validate_log_entry"
+          ],
+          "module":"loader.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\loader.py"
+        },
+        {
+          "constants":[
+            {
+              "name":"VALID_LEVELS",
+              "value":"{'DEBUG', 'INFO', 'WARN', 'ERROR'}"
+            }
+          ],
+          "functions":[
+            "execute_summary",
+            "execute_filter",
+            "_apply_time_window_filter",
+            "_is_within_time_window",
+            "execute_top",
+            "execute_export"
+          ],
+          "imports":[
+            "from datetime import datetime",
+            "from collections import Counter",
+            "import json",
+            "import sys",
+            "from validation import validate_log_entry"
+          ],
+          "module":"commands.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\commands.py"
+        },
+        {
+          "constants":[],
+          "functions":[
+            "format_summary_output",
+            "format_filter_output",
+            "format_top_output",
+            "format_export_output"
+          ],
+          "imports":[
+            "import json"
+          ],
+          "module":"output.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\output.py"
+        },
+        {
+          "constants":[],
+          "functions":[
+            "test_summary_command",
+            "test_filter_command_with_time_window",
+            "test_export_command_deterministic",
+            "test_top_command_deterministic",
+            "test_top_command_json_output",
+            "test_top_command_empty_event_type",
+            "test_top_command_missing_event_type",
+            "test_top_command_invalid_format",
+            "test_top_command_default_format",
+            "test_invalid_event_type",
+            "test_malformed_jsonl_handling",
+            "test_time_window_boundaries",
+            "test_summary_human_readable_output",
+            "test_invalid_event_type_whitespace",
+            "test_empty_input_file",
+            "test_nonexistent_input_file",
+            "test_invalid_time_format_arg",
+            "test_start_time_after_end_time",
+            "test_missing_required_event_type_arg",
+            "test_determinism_with_identical_timestamps",
+            "test_event_type_validation_error_format",
+            "test_time_window_inclusive_boundaries",
+            "test_filter_event_type_case_sensitive",
+            "test_top_command_group_by_level",
+            "test_top_command_group_by_event_type",
+            "test_top_command_group_by_event_type_requires_event_type_arg",
+            "test_top_command_group_by_determinism",
+            "_create_test_fixture",
+            "_cleanup_file"
+          ],
+          "imports":[
+            "import os",
+            "import json",
+            "import tempfile",
+            "import subprocess",
+            "import sys"
+          ],
+          "module":"test_cli.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\test_cli.py"
+        }
+      ],
+      "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2"
+    },
+    "base_path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code"
+  },
+  "exploration":{
+    "runs_completed":30,
+    "warmup_runs":3
+  },
+  "final_model":"M2",
+  "last_run_id":"run_000030",
+  "model_pool":{
+    "M1":{
+      "cost_tier":"mid",
+      "label":"Gemini 2.5 Pro",
+      "params":{
+        "temperature":0.0
+      },
+      "provider":"gemini",
+      "provider_model":"gemini-2.5-pro"
+    },
+    "M2":{
+      "cost_tier":"mid",
+      "label":"Claude Sonnet 4.5",
+      "params":{
+        "temperature":0.0
+      },
+      "provider":"anthropic",
+      "provider_model":"claude-sonnet-4-5-20250929"
+    }
+  },
+  "role_model_stats":{
+    "architect":{
+      "M1":{
+        "last_used_run_id":"run_000030",
+        "mean_cost":0.11315789473684214,
+        "mean_reward":0.978421052631579,
+        "n":19,
+        "ucb":1.1476495692613988
+      },
+      "M2":{
+        "last_used_run_id":"run_000027",
+        "mean_cost":0.14642857142857144,
+        "mean_reward":0.8964285714285715,
+        "n":14,
+        "ucb":1.0843032171405067
+      }
+    },
+    "implementer":{
+      "M1":{
+        "last_used_run_id":"run_000027",
+        "mean_cost":0.1375,
+        "mean_reward":0.910625,
+        "n":16,
+        "ucb":1.0861541935709471
+      },
+      "M2":{
+        "last_used_run_id":"run_000030",
+        "mean_cost":0.17176470588235296,
+        "mean_reward":0.9117647058823529,
+        "n":17,
+        "ucb":1.0698169079389765
+      }
+    }
+  },
+  "routing_policy":{
+    "cost_penalty":0.4,
+    "ucb_c":0.5
+  },
+  "timeout_defaults":{
+    "chairman_timeout_s":360,
+    "run_agents_timeout_s":300
+  },
+  "weighted_inputs":{
+    "architect":0.5,
+    "implementer":0.5
+  }
+}

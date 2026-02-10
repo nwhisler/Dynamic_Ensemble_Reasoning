@@ -1,0 +1,448 @@
+{
+  "chairman_active":"C1",
+  "chairman_edits":{
+    "bootstrap":{
+      "M1":{
+        "approved_edits":[
+          {
+            "content":"import json\n\ndef validate_log_entry(entry):\n    \"\"\"\n    Validate a single log entry object against a predefined schema.\n\n    A valid entry must be a dictionary containing 'timestamp', 'level',\n    and 'message' keys, all with string values.\n\n    Args:\n        entry: A dictionary representing a single log entry.\n\n    Returns:\n        True if the entry is valid, False otherwise.\n    \"\"\"\n    if not isinstance(entry, dict):\n        return False\n    \n    required_keys = {\"timestamp\", \"level\", \"message\"}\n    if not required_keys.issubset(entry.keys()):\n        return False\n\n    if not all(isinstance(entry[key], str) for key in required_keys):\n        return False\n        \n    return True\n\ndef parse_log_file(file_path):\n    \"\"\"\n    Read a .jsonl log file, parse and validate each line, and return a sorted list of valid log entries.\n\n    This function gracefully handles file-not-found errors and skips lines\n    that are empty, contain invalid JSON, or fail schema validation.\n\n    Args:\n        file_path: The path to the .jsonl log file.\n\n    Returns:\n        A list of valid log entry dictionaries, sorted by timestamp.\n    \"\"\"\n    valid_entries = []\n    try:\n        with open(file_path, 'r', encoding='utf-8') as f:\n            for line in f:\n                line = line.strip()\n                if not line:\n                    continue\n                \n                try:\n                    log_entry = json.loads(line)\n                    if validate_log_entry(log_entry):\n                        valid_entries.append(log_entry)\n                except json.JSONDecodeError:\n                    # Skip lines that are not valid JSON\n                    continue\n    except FileNotFoundError:\n        print(f\"Error: File not found at '{file_path}'\")\n        return []\n\n    valid_entries.sort(key=lambda entry: entry['timestamp'])\n    return valid_entries",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\parser.py",
+            "proposal_ids":[
+              "schema_validation_logic",
+              "deterministic_log_parsing"
+            ]
+          },
+          {
+            "content":"import argparse\n\ndef main():\n    \"\"\"\n    Main entry point for the CLI application.\n    Parses arguments and dispatches to command handlers.\n    \"\"\"\n    parser = argparse.ArgumentParser(description=\"Analyze .jsonl event logs.\")\n    parser.add_argument(\"logfile\", help=\"Path to the input .jsonl log file.\")\n    parser.add_argument(\"--start-time\", help=\"Start of the time window (ISO 8601 format).\")\n    parser.add_argument(\"--end-time\", help=\"End of the time window (ISO 8601 format).\")\n\n    subparsers = parser.add_subparsers(dest=\"command\", required=True, help=\"Available commands\")\n\n    # Summary command\n    subparsers.add_parser(\"summary\", help=\"Show a summary of log entries.\")\n\n    # Filter command\n    parser_filter = subparsers.add_parser(\"filter\", help=\"Filter log entries by time window.\")\n\n    # Top command\n    parser_top = subparsers.add_parser(\"top\", help=\"Show the top N most frequent log messages.\")\n    parser_top.add_argument(\"--n\", type=int, default=10, help=\"Number of results to show.\")\n\n    # Export command\n    parser_export = subparsers.add_parser(\"export\", help=\"Export log entries to a file.\")\n    parser_export.add_argument(\"--output\", help=\"Path to the output file.\")\n\n    args = parser.parse_args()\n\n    # Placeholder for command delegation\n    if args.command == \"summary\":\n        print(f\"Executing summary command for {args.logfile}\")\n        # Call summary handler function here\n    elif args.command == \"filter\":\n        print(f\"Executing filter command for {args.logfile} from {args.start_time} to {args.end_time}\")\n        # Call filter handler function here\n    elif args.command == \"top\":\n        print(f\"Executing top command for {args.logfile} with n={args.n}\")\n        # Call top handler function here\n    elif args.command == \"export\":\n        print(f\"Executing export command for {args.logfile} to {args.output}\")\n        # Call export handler function here\n\nif __name__ == \"__main__\":\n    main()",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\main.py",
+            "proposal_ids":[
+              "cli_time_window_args"
+            ]
+          }
+        ]
+      },
+      "M2":{
+        "approved_edits":[
+          {
+            "content":"from datetime import datetime\nfrom collections import Counter\nimport json\n\nVALID_LEVELS = {'DEBUG', 'INFO', 'WARN', 'ERROR'}\n\ndef execute_summary(log_entries):\n    \"\"\"\n    Generate summary statistics from loaded logs.\n    \n    Args:\n        log_entries: List of validated log entry dicts\n        \n    Returns:\n        Dict with 'total' (int) and 'by_level' (dict) keys\n    \"\"\"\n    if not log_entries:\n        return {'total': 0, 'by_level': {}}\n    level_counts = {}\n    for entry in log_entries:\n        level = entry.get('level', '')\n        level_counts[level] = level_counts.get(level, 0) + 1\n    sorted_by_level = dict(sorted(level_counts.items()))\n    return {\n        'total': len(log_entries),\n        'by_level': sorted_by_level\n    }\n\ndef execute_filter(log_entries, level, start_time=None, end_time=None):\n    \"\"\"\n    Filter log entries by level and optional time window.\n    \n    Args:\n        log_entries: List of validated log entry dicts\n        level: Level string to filter by\n        start_time: Optional ISO timestamp string for start of window\n        end_time: Optional ISO timestamp string for end of window\n        \n    Returns:\n        List of filtered entries sorted by timestamp, then event_type\n    \"\"\"\n    if level not in VALID_LEVELS:\n        return []\n    filtered = []\n    for entry in log_entries:\n        if entry.get('level') != level:\n            continue\n        if start_time is not None or end_time is not None:\n            timestamp_str = entry.get('timestamp', '')\n            if not _is_within_time_window(timestamp_str, start_time, end_time):\n                continue\n        filtered.append(entry)\n    filtered.sort(key=lambda e: (e.get('timestamp', ''), e.get('event_type', '')))\n    return filtered\n\ndef _is_within_time_window(timestamp_str, start_time, end_time):\n    \"\"\"\n    Check if timestamp falls within the specified time window.\n    \n    Args:\n        timestamp_str: ISO timestamp string\n        start_time: Optional ISO timestamp string for start\n        end_time: Optional ISO timestamp string for end\n        \n    Returns:\n        Boolean indicating if timestamp is within window\n    \"\"\"\n    if not timestamp_str:\n        return False\n    try:\n        ts = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))\n    except (ValueError, AttributeError):\n        return False\n    if start_time is not None:\n        try:\n            start = datetime.fromisoformat(start_time.replace('Z', '+00:00'))\n            if ts < start:\n                return False\n        except (ValueError, AttributeError):\n            return False\n    if end_time is not None:\n        try:\n            end = datetime.fromisoformat(end_time.replace('Z', '+00:00'))\n            if ts > end:\n                return False\n        except (ValueError, AttributeError):\n            return False\n    return True\n\ndef execute_top(log_entries, n):\n    \"\"\"\n    Return top N most frequent event types with counts.\n    \n    Args:\n        log_entries: List of validated log entry dicts\n        n: Integer number of top entries to return\n        \n    Returns:\n        List of tuples (event_type, count) sorted by count desc, event_type asc\n    \"\"\"\n    if not isinstance(n, int) or n <= 0:\n        return []\n    if not log_entries:\n        return []\n    event_counts = Counter()\n    for entry in log_entries:\n        event_type = entry.get('event_type', '')\n        if event_type:\n            event_counts[event_type] += 1\n    sorted_events = sorted(\n        event_counts.items(),\n        key=lambda x: (-x[1], x[0])\n    )\n    return sorted_events[:n]\n\ndef execute_export(logs, output_path, level=None, start_time=None, end_time=None):\n    \"\"\"\n    Export filtered or full log entries to a JSON file with deterministic ordering.\n    \n    Args:\n        logs: List of log entry dicts\n        output_path: String path to output JSON file\n        level: Optional level string to filter by\n        start_time: Optional ISO timestamp string for start of window\n        end_time: Optional ISO timestamp string for end of window\n        \n    Returns:\n        Integer count of exported entries\n    \"\"\"\n    if not logs:\n        logs = []\n    filtered = []\n    for entry in logs:\n        if not entry.get('timestamp') or not entry.get('event_type') or not entry.get('level'):\n            continue\n        if level is not None and entry.get('level') != level:\n            continue\n        if start_time is not None or end_time is not None:\n            if not _is_within_time_window(entry.get('timestamp', ''), start_time, end_time):\n                continue\n        filtered.append(entry)\n    filtered.sort(key=lambda e: (e.get('timestamp', ''), e.get('event_type', '')))\n    try:\n        with open(output_path, 'w', encoding='utf-8') as f:\n            json.dump(filtered, f, indent=2)\n    except (IOError, OSError) as e:\n        return 0\n    return len(filtered)",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\commands.py",
+            "proposal_ids":[
+              "arch_007_export_command"
+            ]
+          },
+          {
+            "content":"#!/usr/bin/env python3\n\"\"\"CLI entry point for log_analyzer tool.\"\"\"\n\nimport argparse\nimport sys\nimport os\nfrom loader import load_jsonl_logs\nfrom commands import execute_summary, execute_filter, execute_top, execute_export\n\n\ndef main():\n    \"\"\"Parse CLI arguments for commands summary, filter, top, and export with required input file path and optional parameters.\"\"\"\n    if not _validate_args():\n        return 1\n    \n    parser = argparse.ArgumentParser(\n        prog=\"log_analyzer\",\n        description=\"Analyze JSONL event logs with deterministic output\"\n    )\n    \n    subparsers = parser.add_subparsers(dest=\"command\", required=True, help=\"Available commands\")\n    \n    summary_parser = subparsers.add_parser(\"summary\", help=\"Generate summary statistics\")\n    summary_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    \n    filter_parser = subparsers.add_parser(\"filter\", help=\"Filter logs by criteria\")\n    filter_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    filter_parser.add_argument(\"--level\", help=\"Filter by log level\")\n    filter_parser.add_argument(\"--event-type\", help=\"Filter by event type\")\n    filter_parser.add_argument(\"--start-time\", help=\"Filter start time (ISO 8601)\")\n    filter_parser.add_argument(\"--end-time\", help=\"Filter end time (ISO 8601)\")\n    \n    top_parser = subparsers.add_parser(\"top\", help=\"Show top N events\")\n    top_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    top_parser.add_argument(\"--n\", type=int, default=10, help=\"Number of top events\")\n    top_parser.add_argument(\"--by\", default=\"event_type\", help=\"Group by field\")\n    \n    export_parser = subparsers.add_parser(\"export\", help=\"Export filtered logs to JSON\")\n    export_parser.add_argument(\"input\", help=\"Path to input JSONL log file\")\n    export_parser.add_argument(\"--output\", required=True, help=\"Output JSON file path\")\n    export_parser.add_argument(\"--level\", help=\"Filter by log level\")\n    export_parser.add_argument(\"--event-type\", help=\"Filter by event type\")\n    export_parser.add_argument(\"--start-time\", help=\"Filter start time (ISO 8601)\")\n    export_parser.add_argument(\"--end-time\", help=\"Filter end time (ISO 8601)\")\n    \n    args = parser.parse_args()\n    \n    if not _validate_input_file(args.input):\n        return 1\n    \n    result = dispatch_command(args)\n    if result is None:\n        return 1\n    \n    return 0\n\n\ndef _validate_args():\n    \"\"\"Validate that arguments are provided.\"\"\"\n    if not sys.argv or len(sys.argv) < 2:\n        return True\n    return True\n\n\ndef _validate_input_file(file_path):\n    \"\"\"Validate that input file exists.\"\"\"\n    if not file_path:\n        print(\"Error: Input file path is required\", file=sys.stderr)\n        return False\n    \n    if not os.path.exists(file_path):\n        print(f\"Error: Input file does not exist: {file_path}\", file=sys.stderr)\n        return False\n    \n    if not os.path.isfile(file_path):\n        print(f\"Error: Input path is not a file: {file_path}\", file=sys.stderr)\n        return False\n    \n    return True\n\n\ndef dispatch_command(args):\n    \"\"\"\n    Route validated CLI arguments to the appropriate command function.\n    \n    Args:\n        args: Parsed argparse namespace with command and parameters\n        \n    Returns:\n        Command result or None on failure\n    \"\"\"\n    try:\n        log_entries = load_jsonl_logs(args.input)\n    except Exception as e:\n        print(f\"Error loading logs: {e}\", file=sys.stderr)\n        return None\n    if args.command == \"summary\":\n        return execute_summary(log_entries)\n    elif args.command == \"filter\":\n        level = getattr(args, 'level', None)\n        start_time = getattr(args, 'start_time', None)\n        end_time = getattr(args, 'end_time', None)\n        if level:\n            return execute_filter(log_entries, level, start_time, end_time)\n        return log_entries\n    elif args.command == \"top\":\n        n = getattr(args, 'n', 10)\n        return execute_top(log_entries, n)\n    elif args.command == \"export\":\n        output = getattr(args, 'output', None)\n        level = getattr(args, 'level', None)\n        start_time = getattr(args, 'start_time', None)\n        end_time = getattr(args, 'end_time', None)\n        return execute_export(log_entries, output, level, start_time, end_time)\n    return None\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\main.py",
+            "proposal_ids":[
+              "arch_008_cli_dispatch"
+            ]
+          },
+          {
+            "content":"\"\"\"Output formatting functions for log_analyzer CLI.\"\"\"\n\n\ndef format_summary_output(summary):\n    \"\"\"\n    Format summary statistics dictionary into deterministic human-readable string.\n    \n    Args:\n        summary: Dict with 'total' (int) and 'by_level' (dict) keys\n        \n    Returns:\n        Single string with newline separators\n    \"\"\"\n    if not summary:\n        return \"Total: 0\"\n    total = summary.get('total', 0)\n    by_level = summary.get('by_level', {})\n    lines = [f\"Total: {total}\"]\n    if by_level:\n        sorted_levels = sorted(by_level.items())\n        for level, count in sorted_levels:\n            lines.append(f\"{level}: {count}\")\n    return \"\\n\".join(lines)",
+            "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\output.py",
+            "proposal_ids":[
+              "arch_009_output_formatter"
+            ]
+          }
+        ]
+      }
+    },
+    "iterate":{
+      "approved_edits":[
+        {
+          "content":"\"\"\"Tests for CLI commands with deterministic output validation.\"\"\"\n\nimport os\nimport json\nimport tempfile\nimport subprocess\nimport sys\n\n\ndef test_summary_command():\n    \"\"\"Validate that the summary command produces deterministic output with correct counts for all log levels and event types.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"summary\", fixture_path],\n            capture_output=True,\n            text=True,\n            timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: summary command failed with code {result.returncode}\", file=sys.stderr)\n            return False\n        \n        output = result.stdout\n        if not output:\n            print(\"Error: summary command produced no output\", file=sys.stderr)\n            return False\n        \n        if \"Total entries:\" not in output:\n            print(\"Error: summary output missing expected format\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_filter_command_with_time_window():\n    \"\"\"Validate that the filter command correctly filters logs by time window and event type, producing deterministic sorted output.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path,\n             \"--event-type\", \"user_login\",\n             \"--start-time\", \"2024-01-01T00:00:00Z\",\n             \"--end-time\", \"2024-12-31T23:59:59Z\"],\n            capture_output=True,\n            text=True,\n            timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: filter command failed with code {result.returncode}\", file=sys.stderr)\n            return False\n        \n        output = result.stdout\n        if not output:\n            print(\"Error: filter command produced no output\", file=sys.stderr)\n            return False\n        \n        lines = output.strip().split('\\n')\n        if len(lines) < 1:\n            print(\"Error: filter output has insufficient lines\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_export_command_deterministic():\n    \"\"\"Validate that the export command writes deterministic JSON output with sorted keys and proper indentation to the output file.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    output_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:\n            output_path = f.name\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"export\", fixture_path,\n             \"--output\", output_path],\n            capture_output=True,\n            text=True,\n            timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: export command failed with code {result.returncode}\", file=sys.stderr)\n            return False\n        \n        if not os.path.exists(output_path):\n            print(\"Error: export command did not create output file\", file=sys.stderr)\n            return False\n        \n        with open(output_path, 'r') as f:\n            content = f.read()\n        \n        if not content:\n            print(\"Error: export output file is empty\", file=sys.stderr)\n            return False\n        \n        try:\n            data = json.loads(content)\n        except json.JSONDecodeError:\n            print(\"Error: export output is not valid JSON\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n        if output_path:\n            _cleanup_file(output_path)\n\n\ndef test_top_command_deterministic():\n    \"\"\"Validate that the 'top' command produces deterministic, sorted output and respects the limit.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"logout\",\"level\":\"INFO\",\"message\":\"User logged out\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:01:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"User logged in\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:02:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"User logged in again\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:03:00Z\",\"event_type\":\"error\",\"level\":\"ERROR\",\"message\":\"An error occurred\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:04:00Z\",\"event_type\":\"logout\",\"level\":\"INFO\",\"message\":\"Another user logged out\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:05:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"Third user logged in\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:06:00Z\",\"event_type\":\"warning\",\"level\":\"WARN\",\"message\":\"A warning was issued\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:07:00Z\",\"event_type\":\"error\",\"level\":\"ERROR\",\"message\":\"Another error occurred\"}\\n'\n    )\n    \n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--n\", \"3\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: top command failed. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        expected_output = \"login: 3\\nerror: 2\\nlogout: 2\"\n        if result.stdout.strip() != expected_output:\n            print(f\"Error: top command output mismatch. Expected:\\n{expected_output}\\nGot:\\n{result.stdout.strip()}\", file=sys.stderr)\n            return False\n\n        result_level = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--n\", \"2\", \"--group-by\", \"level\"],\n            capture_output=True, text=True, timeout=10\n        )\n\n        if result_level.returncode != 0:\n            print(f\"Error: top command with group-by level failed. Stderr: {result_level.stderr}\", file=sys.stderr)\n            return False\n\n        expected_output_level = \"INFO: 5\\nERROR: 2\"\n        if result_level.stdout.strip() != expected_output_level:\n            print(f\"Error: top command output mismatch for group-by level. Expected:\\n{expected_output_level}\\nGot:\\n{result_level.stdout.strip()}\", file=sys.stderr)\n            return False\n\n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_top_command_json_output():\n    \"\"\"Verify the 'top' command correctly produces JSON output when '--format json' is specified.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"User logged in\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:01:00Z\",\"event_type\":\"logout\",\"level\":\"INFO\",\"message\":\"User logged out\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:02:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"User logged in again\"}\\n'\n    )\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--n\", \"2\", \"--format\", \"json\"],\n            capture_output=True, text=True, timeout=10\n        )\n\n        if result.returncode != 0:\n            print(f\"Error: top command with json format failed. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n\n        try:\n            output_data = json.loads(result.stdout)\n        except json.JSONDecodeError:\n            print(f\"Error: top command output is not valid JSON. Output: {result.stdout}\", file=sys.stderr)\n            return False\n\n        expected_data = {\"login\": 2, \"logout\": 1}\n        if output_data != expected_data:\n            print(f\"Error: JSON output mismatch. Expected: {expected_data}, Got: {output_data}\", file=sys.stderr)\n            return False\n\n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_top_command_empty_event_type():\n    \"\"\"Verify 'top' command fails with an empty string for --event-type.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--event-type\", \"\"],\n            capture_output=True,\n            text=True,\n            timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: 'top' command with empty event_type succeeded unexpectedly.\", file=sys.stderr)\n            return False\n        \n        expected_error = \"Error: --event-type argument cannot be empty or contain only whitespace.\"\n        if expected_error not in result.stderr:\n            print(f\"Error: Expected error message not found for empty --event-type. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_top_command_missing_event_type():\n    \"\"\"Ensure the 'top' command fails when the mandatory '--event-type' argument is not provided.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: 'top' command succeeded without mandatory '--event-type' argument.\", file=sys.stderr)\n            return False\n            \n        if \"required\" not in result.stderr.lower() or \"--event-type\" not in result.stderr:\n            print(f\"Error: Expected error message for missing '--event-type' not found in stderr. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n            \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_top_command_invalid_format():\n    \"\"\"Ensure the 'top' command fails when an invalid value is provided for the '--format' argument.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--format\", \"xml\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: 'top' command succeeded with invalid format 'xml'.\", file=sys.stderr)\n            return False\n            \n        if \"invalid choice\" not in result.stderr.lower():\n            print(f\"Error: Expected error message for invalid format not found in stderr. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n            \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_top_command_default_format():\n    \"\"\"Verify the 'top' command produces the default human-readable output when the '--format' argument is omitted.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"User logged in\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:01:00Z\",\"event_type\":\"logout\",\"level\":\"INFO\",\"message\":\"User logged out\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:02:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"User logged in again\"}\\n'\n    )\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--n\", \"2\"],\n            capture_output=True, text=True, timeout=10\n        )\n\n        if result.returncode != 0:\n            print(f\"Error: top command with default format failed. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n\n        expected_output = \"login: 2\\nlogout: 1\"\n        if result.stdout.strip() != expected_output:\n            print(f\"Error: Default format output mismatch. Expected:\\n{expected_output}\\nGot:\\n{result.stdout.strip()}\", file=sys.stderr)\n            return False\n\n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_invalid_event_type():\n    \"\"\"Validate that an empty event_type argument triggers a non-zero exit code.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path, \"--event-type\", \"\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: Empty event_type did not cause a failure.\", file=sys.stderr)\n            return False\n        \n        if \"Error: event_type cannot be an empty string\" not in result.stderr:\n            print(\"Error: Expected error message for empty event_type not found.\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_malformed_jsonl_handling():\n    \"\"\"Validate that malformed JSONL lines are skipped gracefully and valid entries are processed.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"user_login\",\"level\":\"INFO\",\"message\":\"User logged in\"}\\n'\n        'this is not a valid json line\\n'\n        '{\"timestamp\":\"2024-06-15T10:05:00Z\",\"event_type\":\"user_logout\",\"level\":\"INFO\",\"message\":\"User logged out\"}\\n'\n        '{\"level\":\"WARN\"}\\n'\n    )\n    \n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"summary\", fixture_path],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: summary command failed with malformed file. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        if \"Total entries: 2\" not in result.stdout:\n            print(f\"Error: summary count is incorrect for malformed file. Output: {result.stdout}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_time_window_boundaries():\n    \"\"\"Validate that time window filtering correctly handles exact boundary timestamps.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-01-01T09:59:59Z\", \"event_type\":\"before\", \"level\":\"INFO\", \"message\":\"before window\"}\\n'\n        '{\"timestamp\":\"2024-01-01T10:00:00Z\", \"event_type\":\"on_start\", \"level\":\"INFO\", \"message\":\"on start window\"}\\n'\n        '{\"timestamp\":\"2024-01-01T11:00:00Z\", \"event_type\":\"in_middle\", \"level\":\"INFO\", \"message\":\"in middle window\"}\\n'\n        '{\"timestamp\":\"2024-01-01T12:00:00Z\", \"event_type\":\"on_end\", \"level\":\"INFO\", \"message\":\"on end window\"}\\n'\n        '{\"timestamp\":\"2024-01-01T12:00:01Z\", \"event_type\":\"after\", \"level\":\"INFO\", \"message\":\"after window\"}\\n'\n    )\n    \n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path,\n             \"--start-time\", \"2024-01-01T10:00:00Z\",\n             \"--end-time\", \"2024-01-01T12:00:00Z\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: filter command failed on boundary test. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        output_lines = result.stdout.strip().split('\\n')\n        if len(output_lines) != 3:\n            print(f\"Error: Incorrect number of lines in boundary test output. Expected 3, got {len(output_lines)}\", file=sys.stderr)\n            return False\n        \n        output_content = result.stdout\n        if \"on_start\" not in output_content or \"in_middle\" not in output_content or \"on_end\" not in output_content:\n            print(\"Error: Boundary test output missing expected events.\", file=sys.stderr)\n            return False\n        \n        if \"before\" in output_content or \"after\" in output_content:\n            print(\"Error: Boundary test output contains unexpected events.\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_summary_human_readable_output():\n    \"\"\"Validate that the summary command produces correct human-readable string output with all expected labels.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"summary\", fixture_path],\n            capture_output=True,\n            text=True,\n            timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: summary command failed with code {result.returncode}\", file=sys.stderr)\n            return False\n        \n        output = result.stdout\n        if not output:\n            print(\"Error: summary command produced no output\", file=sys.stderr)\n            return False\n        \n        required_labels = [\"Total entries:\", \"Event types:\", \"Levels:\", \"Time range:\"]\n        for label in required_labels:\n            if label not in output:\n                print(f\"Error: summary output missing expected label '{label}'\", file=sys.stderr)\n                return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_invalid_event_type_whitespace():\n    \"\"\"Validate that event_type arguments that are empty or contain only whitespace trigger a non-zero exit code.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path, \"--event-type\", \"\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: Empty event_type did not cause a failure.\", file=sys.stderr)\n            return False\n        \n        if \"Error:\" not in result.stderr:\n            print(\"Error: Expected error message for empty event_type not found.\", file=sys.stderr)\n            return False\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path, \"--event-type\", \"   \"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: Whitespace-only event_type did not cause a failure.\", file=sys.stderr)\n            return False\n        \n        if \"Error:\" not in result.stderr:\n            print(\"Error: Expected error message for whitespace event_type not found.\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_empty_input_file():\n    \"\"\"Validate that all commands handle an empty input .jsonl file gracefully without crashing.\"\"\"\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"summary\", fixture_path],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: summary command failed on empty file. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        if \"Total entries: 0\" not in result.stdout:\n            print(\"Error: summary output incorrect for empty file.\", file=sys.stderr)\n            return False\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: filter command failed on empty file. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--n\", \"5\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: top command failed on empty file. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        output_path = None\n        try:\n            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:\n                output_path = f.name\n            \n            result = subprocess.run(\n                [sys.executable, \"main.py\", \"export\", fixture_path, \"--output\", output_path],\n                capture_output=True, text=True, timeout=10\n            )\n            \n            if result.returncode != 0:\n                print(f\"Error: export command failed on empty file. Stderr: {result.stderr}\", file=sys.stderr)\n                return False\n            \n            with open(output_path, 'r') as f:\n                content = f.read()\n            \n            data = json.loads(content)\n            if not isinstance(data, list) or len(data) != 0:\n                print(\"Error: export output incorrect for empty file.\", file=sys.stderr)\n                return False\n        finally:\n            if output_path:\n                _cleanup_file(output_path)\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_nonexistent_input_file():\n    \"\"\"Validate that the CLI exits with an error when the specified input file does not exist.\"\"\"\n    nonexistent_path = \"/tmp/this_file_does_not_exist_12345.jsonl\"\n    \n    result = subprocess.run(\n        [sys.executable, \"main.py\", \"summary\", nonexistent_path],\n        capture_output=True, text=True, timeout=10\n    )\n    \n    if result.returncode == 0:\n        print(\"Error: Command succeeded with nonexistent file.\", file=sys.stderr)\n        return False\n    \n    if \"Error:\" not in result.stderr:\n        print(\"Error: Expected error message for nonexistent file not found.\", file=sys.stderr)\n        return False\n    \n    return True\n\n\ndef test_invalid_time_format_arg():\n    \"\"\"Validate that the CLI rejects invalid ISO 8601 time formats for --start-time and --end-time arguments and provides an informative error.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path,\n             \"--start-time\", \"not-a-date\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: Invalid time format did not cause a failure.\", file=sys.stderr)\n            return False\n        \n        if \"Error:\" not in result.stderr:\n            print(\"Error: Expected error message for invalid time format not found.\", file=sys.stderr)\n            return False\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path,\n             \"--end-time\", \"invalid-timestamp\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: Invalid end-time format did not cause a failure.\", file=sys.stderr)\n            return False\n        \n        if \"Error:\" not in result.stderr:\n            print(\"Error: Expected error message for invalid end-time format not found.\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_start_time_after_end_time():\n    \"\"\"Validate that the CLI fails if --start-time is after --end-time.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path,\n             \"--start-time\", \"2025-01-01T00:00:00Z\",\n             \"--end-time\", \"2024-01-01T00:00:00Z\"],\n            capture_output=True,\n            text=True,\n            timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: Command succeeded with start_time after end_time.\", file=sys.stderr)\n            return False\n        \n        expected_error = \"Error: --start-time cannot be after --end-time.\"\n        if expected_error not in result.stderr:\n            print(f\"Error: Expected error message '{expected_error}' not found in stderr.\", file=sys.stderr)\n            print(f\"Stderr was: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_missing_required_event_type_arg():\n    \"\"\"Validate that commands requiring --event-type (filter, top, export) fail with an error message when the argument is missing.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: filter command succeeded without --event-type.\", file=sys.stderr)\n            return False\n        \n        if \"Error:\" not in result.stderr and \"required\" not in result.stderr.lower():\n            print(\"Error: Expected error message for missing --event-type not found.\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_determinism_with_identical_timestamps():\n    \"\"\"Validate that the output order is deterministic when multiple log entries share the exact same timestamp.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"event_b\",\"level\":\"INFO\",\"message\":\"b\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"event_a\",\"level\":\"WARN\",\"message\":\"a\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"event_c\",\"level\":\"ERROR\",\"message\":\"c\"}\\n'\n    )\n    \n    fixture_path = None\n    output_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:\n            output_path = f.name\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"export\", fixture_path, \"--output\", output_path],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: export command failed on identical timestamps. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        with open(output_path, 'r') as f:\n            content_output = f.read()\n        \n        data = json.loads(content_output)\n        if len(data) != 3:\n            print(\"Error: Incorrect number of entries in output.\", file=sys.stderr)\n            return False\n        \n        result2 = subprocess.run(\n            [sys.executable, \"main.py\", \"export\", fixture_path, \"--output\", output_path],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result2.returncode != 0:\n            print(f\"Error: Second export command failed. Stderr: {result2.stderr}\", file=sys.stderr)\n            return False\n        \n        with open(output_path, 'r') as f:\n            content_output2 = f.read()\n        \n        if content_output != content_output2:\n            print(\"Error: Output order is not deterministic for identical timestamps.\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n        if output_path:\n            _cleanup_file(output_path)\n\n\ndef test_event_type_validation_error_format():\n    \"\"\"Validate that invalid event type errors are reported with consistent formatting using the centralized error helper.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path, \"--event-type\", \"\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: Empty event_type did not cause a failure.\", file=sys.stderr)\n            return False\n        \n        if not result.stderr.startswith(\"Error: \"):\n            print(\"Error: Error message does not start with 'Error: ' prefix.\", file=sys.stderr)\n            return False\n        \n        if \"--event-type\" not in result.stderr:\n            print(\"Error: Error message does not mention --event-type.\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_time_window_inclusive_boundaries():\n    \"\"\"Verify that time window filtering is inclusive of the start and end boundaries.\"\"\"\n    content = (\n        '{\"timestamp\":\"2023-01-01T10:00:00Z\", \"event_type\":\"boundary_event\", \"level\":\"INFO\", \"message\":\"start\"}\\n'\n        '{\"timestamp\":\"2023-01-01T12:00:00Z\", \"event_type\":\"boundary_event\", \"level\":\"INFO\", \"message\":\"end\"}\\n'\n    )\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path,\n             \"--start-time\", \"2023-01-01T10:00:00Z\",\n             \"--end-time\", \"2023-01-01T12:00:00Z\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: filter command failed on inclusive boundary test. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        output_lines = result.stdout.strip().split('\\n')\n        if len(output_lines) != 2:\n            print(f\"Error: Incorrect number of lines in inclusive boundary test. Expected 2, got {len(output_lines)}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_filter_event_type_case_sensitive():\n    \"\"\"Verify that the --event-type filter is case-sensitive.\"\"\"\n    content = (\n        '{\"timestamp\":\"2023-01-01T10:00:00Z\", \"event_type\":\"login\", \"level\":\"INFO\", \"message\":\"user login\"}\\n'\n        '{\"timestamp\":\"2023-01-01T10:01:00Z\", \"event_type\":\"LOGIN\", \"level\":\"INFO\", \"message\":\"admin login\"}\\n'\n        '{\"timestamp\":\"2023-01-01T10:02:00Z\", \"event_type\":\"Login\", \"level\":\"INFO\", \"message\":\"guest login\"}\\n'\n    )\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"filter\", fixture_path,\n             \"--event-type\", \"login\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: filter command failed on case-sensitive test. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        output = result.stdout.strip()\n        if not output:\n            print(\"Error: case-sensitive test produced no output\", file=sys.stderr)\n            return False\n\n        lines = output.split('\\n')\n        if len(lines) != 1:\n            print(f\"Error: case-sensitive test returned wrong number of lines. Expected 1, got {len(lines)}\", file=sys.stderr)\n            return False\n        \n        try:\n            data = json.loads(lines[0])\n            if data.get(\"event_type\") != \"login\":\n                print(\"Error: case-sensitive test returned wrong event_type.\", file=sys.stderr)\n                return False\n        except json.JSONDecodeError:\n            print(\"Error: case-sensitive test output is not valid JSON.\", file=sys.stderr)\n            return False\n\n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_top_command_group_by_level():\n    \"\"\"Add a test case to verify the 'top' command's '--group-by level' functionality, ensuring it correctly counts and displays the top log levels.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"User logged in\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:01:00Z\",\"event_type\":\"logout\",\"level\":\"INFO\",\"message\":\"User logged out\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:02:00Z\",\"event_type\":\"error\",\"level\":\"ERROR\",\"message\":\"An error occurred\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:03:00Z\",\"event_type\":\"warning\",\"level\":\"WARN\",\"message\":\"A warning\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:04:00Z\",\"event_type\":\"debug\",\"level\":\"DEBUG\",\"message\":\"Debug info\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:05:00Z\",\"event_type\":\"login\",\"level\":\"INFO\",\"message\":\"Another login\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:06:00Z\",\"event_type\":\"error\",\"level\":\"ERROR\",\"message\":\"Another error\"}\\n'\n    )\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--group-by\", \"level\", \"--n\", \"3\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: top command with group-by level failed. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        expected_output = \"INFO: 3\\nERROR: 2\\nDEBUG: 1\"\n        if result.stdout.strip() != expected_output:\n            print(f\"Error: top group-by level output mismatch. Expected:\\n{expected_output}\\nGot:\\n{result.stdout.strip()}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_top_command_group_by_event_type():\n    \"\"\"Add a test case to verify the 'top' command's '--group-by event_type' functionality, ensuring it correctly counts and displays the top event types within a specific event type.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"user_action\",\"level\":\"INFO\",\"message\":\"Action 1\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:01:00Z\",\"event_type\":\"user_action\",\"level\":\"INFO\",\"message\":\"Action 2\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:02:00Z\",\"event_type\":\"user_action\",\"level\":\"INFO\",\"message\":\"Action 3\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:03:00Z\",\"event_type\":\"system_event\",\"level\":\"INFO\",\"message\":\"System 1\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:04:00Z\",\"event_type\":\"system_event\",\"level\":\"INFO\",\"message\":\"System 2\"}\\n'\n    )\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--group-by\", \"event_type\", \"--event-type\", \"user_action\", \"--n\", \"2\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode != 0:\n            print(f\"Error: top command with group-by event_type failed. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        expected_output = \"user_action: 3\"\n        if result.stdout.strip() != expected_output:\n            print(f\"Error: top group-by event_type output mismatch. Expected:\\n{expected_output}\\nGot:\\n{result.stdout.strip()}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef test_top_command_group_by_event_type_requires_event_type_arg():\n    \"\"\"Add a test case to validate that the 'top' command with '--group-by event_type' fails with an error if the '--event-type' argument is not provided.\"\"\"\n    fixture_path = _create_test_fixture()\n    if not fixture_path:\n        print(\"Error: Failed to create test fixture\", file=sys.stderr)\n        return False\n    \n    try:\n        result = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--group-by\", \"event_type\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result.returncode == 0:\n            print(\"Error: top command with group-by event_type succeeded without --event-type.\", file=sys.stderr)\n            return False\n        \n        if \"--event-type\" not in result.stderr or \"required\" not in result.stderr.lower():\n            print(f\"Error: Expected error message for missing --event-type not found. Stderr: {result.stderr}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        _cleanup_file(fixture_path)\n\n\ndef test_top_command_group_by_determinism():\n    \"\"\"Verify that the output for the 'top' command with '--group-by' remains deterministic when counts are equal.\"\"\"\n    content = (\n        '{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"event_a\",\"level\":\"INFO\",\"message\":\"msg\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:01:00Z\",\"event_type\":\"event_b\",\"level\":\"INFO\",\"message\":\"msg\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:02:00Z\",\"event_type\":\"event_c\",\"level\":\"WARN\",\"message\":\"msg\"}\\n'\n        '{\"timestamp\":\"2024-06-15T10:03:00Z\",\"event_type\":\"event_d\",\"level\":\"WARN\",\"message\":\"msg\"}\\n'\n    )\n    fixture_path = None\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            fixture_path = f.name\n            f.write(content)\n        \n        result1 = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--group-by\", \"level\", \"--n\", \"5\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result1.returncode != 0:\n            print(f\"Error: first top command with group-by level failed. Stderr: {result1.stderr}\", file=sys.stderr)\n            return False\n        \n        result2 = subprocess.run(\n            [sys.executable, \"main.py\", \"top\", fixture_path, \"--group-by\", \"level\", \"--n\", \"5\"],\n            capture_output=True, text=True, timeout=10\n        )\n        \n        if result2.returncode != 0:\n            print(f\"Error: second top command with group-by level failed. Stderr: {result2.stderr}\", file=sys.stderr)\n            return False\n        \n        if result1.stdout != result2.stdout:\n            print(f\"Error: top group-by output is not deterministic. First:\\n{result1.stdout}\\nSecond:\\n{result2.stdout}\", file=sys.stderr)\n            return False\n        \n        expected_output = \"INFO: 2\\nWARN: 2\"\n        if result1.stdout.strip() != expected_output:\n            print(f\"Error: top group-by determinism output mismatch. Expected:\\n{expected_output}\\nGot:\\n{result1.stdout.strip()}\", file=sys.stderr)\n            return False\n        \n        return True\n    finally:\n        if fixture_path:\n            _cleanup_file(fixture_path)\n\n\ndef _create_test_fixture():\n    \"\"\"Create a temporary test fixture file with sample log entries.\"\"\"\n    try:\n        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:\n            f.write('{\"timestamp\":\"2024-06-15T10:00:00Z\",\"event_type\":\"user_login\",\"level\":\"INFO\",\"message\":\"User logged in\"}\\n')\n            f.write('{\"timestamp\":\"2024-06-15T10:05:00Z\",\"event_type\":\"user_logout\",\"level\":\"INFO\",\"message\":\"User logged out\"}\\n')\n            f.write('{\"timestamp\":\"2024-06-15T10:10:00Z\",\"event_type\":\"error_occurred\",\"level\":\"ERROR\",\"message\":\"An error occurred\"}\\n')\n            return f.name\n    except Exception as e:\n        print(f\"Error creating test fixture: {e}\", file=sys.stderr)\n        return None\n\n\ndef _cleanup_file(file_path):\n    \"\"\"Remove a temporary file if it exists.\"\"\"\n    if file_path and os.path.exists(file_path):\n        try:\n            os.remove(file_path)\n        except Exception:\n            pass",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\test_cli.py",
+          "proposal_ids":[
+            "add_test_for_top_group_by_level",
+            "add_test_for_top_group_by_event_type",
+            "add_test_for_group_by_validation_logic",
+            "add_test_for_deterministic_top_output_with_grouping"
+          ]
+        }
+      ]
+    }
+  },
+  "chairman_pool":{
+    "C1":{
+      "cost_tier":"mid",
+      "label":"GPT-4.1 Chairman",
+      "params":{
+        "temperature":0.0
+      },
+      "provider":"openai",
+      "provider_model":"gpt-4.1"
+    }
+  },
+  "chairman_summary_store":{
+    "bootstrap":{
+      "M1":{
+        "accepted_design_moves":[
+          {
+            "goal":"Implement strict schema validation for a single log entry, ensuring it contains required fields ('timestamp', 'level', 'message') with correct data types.",
+            "proposal_id":"schema_validation_logic"
+          },
+          {
+            "goal":"Parse a .jsonl log file, validate each entry, and return a list of valid entries sorted by timestamp to ensure deterministic processing.",
+            "proposal_id":"deterministic_log_parsing"
+          },
+          {
+            "goal":"Update the CLI argument parser to accept optional '--start-time' and '--end-time' arguments for time-window filtering.",
+            "proposal_id":"cli_time_window_args"
+          }
+        ],
+        "added_design_moves":[],
+        "files_changed":[
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\parser.py",
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\main.py"
+        ],
+        "files_created":[],
+        "next_priorities":[
+          "Implement the actual logic for the summary, filter, top, and export command handlers.",
+          "Ensure time-window filtering is applied in the filter handler using the parsed --start-time and --end-time arguments.",
+          "Add robust error handling and user feedback for invalid time formats and missing arguments.",
+          "Ensure deterministic output ordering for all commands, especially for export and top."
+        ],
+        "rejected_design_moves":[]
+      },
+      "M2":{
+        "accepted_design_moves":[
+          {
+            "goal":"Export filtered or full log entries to a JSON file with deterministic ordering by timestamp then event_type, validating output schema",
+            "proposal_id":"arch_007_export_command"
+          },
+          {
+            "goal":"Route validated CLI arguments to the appropriate command function in commands module and handle command execution",
+            "proposal_id":"arch_008_cli_dispatch"
+          },
+          {
+            "goal":"Format summary statistics dictionary into deterministic human-readable string output for CLI display",
+            "proposal_id":"arch_009_output_formatter"
+          }
+        ],
+        "added_design_moves":[],
+        "files_changed":[
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\commands.py",
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\main.py"
+        ],
+        "files_created":[
+          "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\output.py"
+        ],
+        "next_priorities":[
+          "Ensure that event-type filtering is implemented for filter and export commands, as the current dispatch_command and execute_export do not use the event-type argument.",
+          "Add robust error handling and user feedback for invalid command parameters and file I/O errors.",
+          "Implement output formatting for filter, top, and export commands for CLI display.",
+          "Add unit tests for all command functions and CLI argument parsing."
+        ],
+        "rejected_design_moves":[]
+      }
+    },
+    "iterate":{
+      "accepted_design_moves":[
+        {
+          "goal":"Add a test case to verify the 'top' command's '--group-by level' functionality, ensuring it correctly counts and displays the top log levels.",
+          "proposal_id":"add_test_for_top_group_by_level"
+        },
+        {
+          "goal":"Add a test case to verify the 'top' command's '--group-by event_type' functionality, ensuring it correctly counts and displays the top event types within a specific event type.",
+          "proposal_id":"add_test_for_top_group_by_event_type"
+        },
+        {
+          "goal":"Add a test case to validate that the 'top' command with '--group-by event_type' fails with an error if the '--event-type' argument is not provided.",
+          "proposal_id":"add_test_for_group_by_validation_logic"
+        },
+        {
+          "goal":"Verify that the output for the 'top' command with '--group-by' remains deterministic when counts are equal.",
+          "proposal_id":"add_test_for_deterministic_top_output_with_grouping"
+        }
+      ],
+      "added_design_moves":[],
+      "files_changed":[
+        "C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\test_cli.py"
+      ],
+      "files_created":[],
+      "next_priorities":[
+        "Expand test coverage for edge cases in 'top' command group-by logic, such as non-existent group keys and mixed log levels.",
+        "Ensure all CLI error messages are consistent and centrally managed for easier test validation.",
+        "Consider adding tests for invalid or missing '--group-by' argument values."
+      ],
+      "rejected_design_moves":[]
+    }
+  },
+  "current_run_id":"run_000030",
+  "directory_structure":{
+    "M1":{
+      "dirs":{
+        "log_analyzer":{
+          "dirs":{},
+          "files":[
+            {
+              "constants":[],
+              "functions":[
+                "main"
+              ],
+              "imports":[
+                "import argparse"
+              ],
+              "module":"main.py",
+              "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\main.py"
+            },
+            {
+              "constants":[],
+              "functions":[
+                "validate_log_entry",
+                "parse_log_file"
+              ],
+              "imports":[
+                "import json"
+              ],
+              "module":"parser.py",
+              "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\parser.py"
+            },
+            {
+              "constants":[],
+              "functions":[
+                "handle_summary",
+                "handle_filter",
+                "handle_top"
+              ],
+              "imports":[
+                "import collections"
+              ],
+              "module":"commands.py",
+              "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer\\commands.py"
+            }
+          ],
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1\\log_analyzer"
+        }
+      },
+      "files":[],
+      "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M1"
+    },
+    "M2":{
+      "dirs":{},
+      "files":[
+        {
+          "constants":[],
+          "functions":[
+            "main",
+            "_exit_with_error",
+            "_validate_args",
+            "_validate_input_file",
+            "_validate_time_args",
+            "_validate_event_type_arg",
+            "_validate_format_arg",
+            "dispatch_command"
+          ],
+          "imports":[
+            "import argparse",
+            "import sys",
+            "import os",
+            "from datetime import datetime",
+            "from loader import load_jsonl_logs",
+            "from commands import execute_summary, execute_filter, execute_top, execute_export",
+            "from output import format_summary_output, format_filter_output, format_top_output, format_export_output"
+          ],
+          "module":"main.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\main.py"
+        },
+        {
+          "constants":[
+            {
+              "name":"VALID_LEVELS",
+              "value":"{'DEBUG', 'INFO', 'WARN', 'ERROR'}"
+            },
+            {
+              "name":"REQUIRED_FIELDS",
+              "value":"{'timestamp', 'event_type', 'level', 'message'}"
+            }
+          ],
+          "functions":[
+            "validate_log_entry",
+            "_has_required_fields",
+            "_validate_timestamp",
+            "_validate_event_type",
+            "_validate_level"
+          ],
+          "imports":[
+            "from datetime import datetime"
+          ],
+          "module":"validation.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\validation.py"
+        },
+        {
+          "constants":[],
+          "functions":[
+            "load_jsonl_logs",
+            "_read_and_parse_lines",
+            "_parse_json_line",
+            "_filter_valid_entries",
+            "_sort_by_timestamp"
+          ],
+          "imports":[
+            "import json",
+            "import sys",
+            "from validation import validate_log_entry"
+          ],
+          "module":"loader.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\loader.py"
+        },
+        {
+          "constants":[
+            {
+              "name":"VALID_LEVELS",
+              "value":"{'DEBUG', 'INFO', 'WARN', 'ERROR'}"
+            }
+          ],
+          "functions":[
+            "execute_summary",
+            "execute_filter",
+            "_apply_time_window_filter",
+            "_is_within_time_window",
+            "execute_top",
+            "execute_export"
+          ],
+          "imports":[
+            "from datetime import datetime",
+            "from collections import Counter",
+            "import json",
+            "import sys",
+            "from validation import validate_log_entry"
+          ],
+          "module":"commands.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\commands.py"
+        },
+        {
+          "constants":[],
+          "functions":[
+            "format_summary_output",
+            "format_filter_output",
+            "format_top_output",
+            "format_export_output"
+          ],
+          "imports":[
+            "import json"
+          ],
+          "module":"output.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\output.py"
+        },
+        {
+          "constants":[],
+          "functions":[
+            "test_summary_command",
+            "test_filter_command_with_time_window",
+            "test_export_command_deterministic",
+            "test_top_command_deterministic",
+            "test_top_command_json_output",
+            "test_top_command_empty_event_type",
+            "test_top_command_missing_event_type",
+            "test_top_command_invalid_format",
+            "test_top_command_default_format",
+            "test_invalid_event_type",
+            "test_malformed_jsonl_handling",
+            "test_time_window_boundaries",
+            "test_summary_human_readable_output",
+            "test_invalid_event_type_whitespace",
+            "test_empty_input_file",
+            "test_nonexistent_input_file",
+            "test_invalid_time_format_arg",
+            "test_start_time_after_end_time",
+            "test_missing_required_event_type_arg",
+            "test_determinism_with_identical_timestamps",
+            "test_event_type_validation_error_format",
+            "test_time_window_inclusive_boundaries",
+            "test_filter_event_type_case_sensitive",
+            "test_top_command_group_by_level",
+            "test_top_command_group_by_event_type",
+            "test_top_command_group_by_event_type_requires_event_type_arg",
+            "test_top_command_group_by_determinism",
+            "_create_test_fixture",
+            "_cleanup_file"
+          ],
+          "imports":[
+            "import os",
+            "import json",
+            "import tempfile",
+            "import subprocess",
+            "import sys"
+          ],
+          "module":"test_cli.py",
+          "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2\\test_cli.py"
+        }
+      ],
+      "path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code\\M2"
+    },
+    "base_path":"C:\\Users\\HP\\Documents\\Personal_Projects\\der\\code"
+  },
+  "exploration":{
+    "runs_completed":29,
+    "warmup_runs":3
+  },
+  "final_model":"M2",
+  "last_run_id":"run_000029",
+  "model_pool":{
+    "M1":{
+      "cost_tier":"mid",
+      "label":"Gemini 2.5 Pro",
+      "params":{
+        "temperature":0.0
+      },
+      "provider":"gemini",
+      "provider_model":"gemini-2.5-pro"
+    },
+    "M2":{
+      "cost_tier":"mid",
+      "label":"Claude Sonnet 4.5",
+      "params":{
+        "temperature":0.0
+      },
+      "provider":"anthropic",
+      "provider_model":"claude-sonnet-4-5-20250929"
+    }
+  },
+  "role_model_stats":{
+    "architect":{
+      "M1":{
+        "last_used_run_id":"run_000029",
+        "mean_cost":0.10833333333333336,
+        "mean_reward":0.9827777777777778,
+        "n":18,
+        "ucb":1.158841848422291
+      },
+      "M2":{
+        "last_used_run_id":"run_000027",
+        "mean_cost":0.14642857142857144,
+        "mean_reward":0.8964285714285715,
+        "n":14,
+        "ucb":1.0843032171405067
+      }
+    },
+    "implementer":{
+      "M1":{
+        "last_used_run_id":"run_000027",
+        "mean_cost":0.1375,
+        "mean_reward":0.910625,
+        "n":16,
+        "ucb":1.0861541935709471
+      },
+      "M2":{
+        "last_used_run_id":"run_000029",
+        "mean_cost":0.12000000000000001,
+        "mean_reward":0.96875,
+        "n":16,
+        "ucb":1.1534560881911895
+      }
+    }
+  },
+  "routing_policy":{
+    "cost_penalty":0.4,
+    "ucb_c":0.5
+  },
+  "timeout_defaults":{
+    "chairman_timeout_s":360,
+    "run_agents_timeout_s":300
+  },
+  "weighted_inputs":{
+    "architect":0.5,
+    "implementer":0.5
+  }
+}

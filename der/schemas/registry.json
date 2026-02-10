@@ -1,0 +1,7 @@
+{
+  "architect": "architect.json",
+  "implementer": "implementer.json",
+  "chairman": "chairman.json",
+  "memory": "memory.json",
+  "task": "task.json"
+}

@@ -1,0 +1,6 @@
+{
+  "goal": "Build a deterministic Python CLI tool log_analyzer for analyzing .jsonl event logs, supporting the commands summary, filter, top, and export, with strict schema validation, deterministic output ordering, configurable time-window filtering, and JSON export.",
+  "language": "python",
+  "phase": "iterate",
+  "style": "clean"
+}

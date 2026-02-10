@@ -1,0 +1,29 @@
+{
+  "new_modules": [
+    {
+      "module_path": "string",
+      "edits": [
+        {
+          "proposal_id": "string",
+          "function": "string",
+          "goal": "string",
+          "constraints": ["string"]
+        }
+      ]
+    }
+  ],
+  "module_patches": [
+    {
+      "module_path": "string",
+      "edits": [
+        {
+          "proposal_id": "string",
+          "function": "string",
+          "goal": "string",
+          "constraints": ["string"]
+        }
+      ],
+      "module_content": "string"
+    }
+  ]
+}
